@@ -34,3 +34,6 @@ monitoring/charts/
 .vscode/
 .idea/
 .DS_Store
+
+# Private planning notes (kept local)
+SPEC.md
