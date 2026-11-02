@@ -1,0 +1,24 @@
+# Base manifests for the API and its PostgreSQL database.
+# The postgres-credentials Secret is not here: `make secret` creates it from .env
+# (see postgres-secret.example.yaml for its shape).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: slo-demo
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: slo-demo
+resources:
+  - namespace.yaml
+  - postgres.yaml
+  - api.yaml
+  - api-hpa.yaml
+configMapGenerator:
+  - name: api-config
+    literals:
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=slo_demo
+      - APP_LOG_LEVEL=info
+  - name: postgres-init
+    files:
+      - schema.sql
