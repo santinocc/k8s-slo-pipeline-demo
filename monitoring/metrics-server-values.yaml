@@ -1,0 +1,5 @@
+# Helm values for metrics-server, which the HPA needs for CPU metrics.
+# kind's kubelets use self-signed serving certificates, so TLS verification is
+# skipped. This is acceptable only for a local learning cluster.
+args:
+  - --kubelet-insecure-tls
