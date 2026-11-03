@@ -1,4 +1,4 @@
-# Base manifests for the API and its PostgreSQL database.
+# Base manifests for the API, its PostgreSQL database, and the ingestion CronJob.
 # The postgres-credentials Secret is not here: `make secret` creates it from .env
 # (see postgres-secret.example.yaml for its shape).
 apiVersion: kustomize.config.k8s.io/v1beta1
@@ -12,6 +12,7 @@ resources:
   - postgres.yaml
   - api.yaml
   - api-hpa.yaml
+  - ingest-cronjob.yaml
 configMapGenerator:
   - name: api-config
     literals:
