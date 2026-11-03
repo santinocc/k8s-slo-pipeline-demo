@@ -14,6 +14,7 @@ class Settings:
     postgres_user: str
     postgres_password: str
     log_level: str
+    chaos_enabled: bool = False
 
     @property
     def conninfo(self) -> str:
@@ -37,4 +38,5 @@ def load_settings() -> Settings:
         postgres_user=os.getenv("POSTGRES_USER", "slo_demo"),
         postgres_password=os.getenv("POSTGRES_PASSWORD", ""),
         log_level=os.getenv("APP_LOG_LEVEL", "info"),
+        chaos_enabled=os.getenv("CHAOS_ENABLED", "false").lower() == "true",
     )

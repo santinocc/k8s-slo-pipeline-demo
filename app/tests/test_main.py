@@ -7,9 +7,9 @@ import psycopg
 import pytest
 from fastapi.testclient import TestClient
 
-from api.config import Settings
+from api.config import Settings, load_settings
 from api.db import Item
-from api.main import app, get_repository
+from api.main import app, get_repository, get_settings
 
 SAMPLE = [
     Item(id=1, name="alpha", category="a", value=1.5, updated_at=datetime(2026, 1, 1, tzinfo=UTC)),
@@ -118,6 +118,49 @@ def test_metrics_exposes_request_counters(client: TestClient) -> None:
     assert 'http_requests_total{method="GET",route="/health",status="200"}' in text
     assert 'http_requests_total{method="GET",route="unmatched",status="404"}' in text
     assert "http_request_duration_seconds_bucket" in text
+
+
+def _settings(chaos_enabled: bool) -> Settings:
+    return Settings("db", 5432, "slo_demo", "user", "pw", "info", chaos_enabled=chaos_enabled)
+
+
+@pytest.fixture
+def chaos_client(client: TestClient) -> TestClient:
+    app.dependency_overrides[get_settings] = lambda: _settings(chaos_enabled=True)
+    return client
+
+
+def test_chaos_is_404_when_disabled(client: TestClient) -> None:
+    app.dependency_overrides[get_settings] = lambda: _settings(chaos_enabled=False)
+    assert client.get("/chaos", params={"rate": 1}).status_code == 404
+
+
+def test_chaos_rate_one_always_fails(chaos_client: TestClient) -> None:
+    statuses = {chaos_client.get("/chaos", params={"rate": 1}).status_code for _ in range(20)}
+    assert statuses == {500}
+
+
+def test_chaos_rate_zero_never_fails(chaos_client: TestClient) -> None:
+    statuses = {chaos_client.get("/chaos", params={"rate": 0}).status_code for _ in range(20)}
+    assert statuses == {200}
+
+
+def test_chaos_failures_are_counted_as_5xx(chaos_client: TestClient) -> None:
+    chaos_client.get("/chaos", params={"rate": 1})
+    text = chaos_client.get("/metrics").text
+    assert 'http_requests_total{method="GET",route="/chaos",status="500"}' in text
+
+
+@pytest.mark.parametrize("rate", [-0.1, 1.5])
+def test_chaos_rejects_invalid_rate(chaos_client: TestClient, rate: float) -> None:
+    assert chaos_client.get("/chaos", params={"rate": rate}).status_code == 422
+
+
+def test_chaos_flag_read_from_environment(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("CHAOS_ENABLED", "true")
+    assert load_settings().chaos_enabled is True
+    monkeypatch.setenv("CHAOS_ENABLED", "false")
+    assert load_settings().chaos_enabled is False
 
 
 def test_conninfo_quotes_special_characters() -> None:
