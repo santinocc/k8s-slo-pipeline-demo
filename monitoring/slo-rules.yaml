@@ -1,0 +1,75 @@
+# Recording and alerting rules for the api-availability SLO (see slo/slo.yaml).
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: api-slo
+  labels:
+    app.kubernetes.io/name: api
+spec:
+  groups:
+    - name: slo-api-availability-sli
+      interval: 30s
+      rules:
+        # Error ratio per window. "or vector(0)" keeps the ratio at 0 (not empty)
+        # before the first 5xx response has ever been recorded.
+        - record: slo:sli_error:ratio_rate5m
+          labels: {slo: api-availability}
+          expr: >-
+            (sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics", status=~"5.."}[5m])) or vector(0))
+            / sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics"}[5m]))
+        - record: slo:sli_error:ratio_rate30m
+          labels: {slo: api-availability}
+          expr: >-
+            (sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics", status=~"5.."}[30m])) or vector(0))
+            / sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics"}[30m]))
+        - record: slo:sli_error:ratio_rate1h
+          labels: {slo: api-availability}
+          expr: >-
+            (sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics", status=~"5.."}[1h])) or vector(0))
+            / sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics"}[1h]))
+        - record: slo:sli_error:ratio_rate6h
+          labels: {slo: api-availability}
+          expr: >-
+            (sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics", status=~"5.."}[6h])) or vector(0))
+            / sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics"}[6h]))
+        - record: slo:sli_error:ratio_rate28d
+          labels: {slo: api-availability}
+          expr: >-
+            (sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics", status=~"5.."}[28d])) or vector(0))
+            / sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics"}[28d]))
+        # 1 = full budget left, 0 = budget spent, negative = SLO breached.
+        - record: slo:error_budget_remaining:ratio
+          labels: {slo: api-availability}
+          expr: 1 - slo:sli_error:ratio_rate28d{slo="api-availability"} / (1 - 0.99)
+
+    - name: slo-api-availability-alerts
+      interval: 30s
+      rules:
+        - alert: SLOErrorBudgetBurnFast
+          expr: >-
+            slo:sli_error:ratio_rate1h{slo="api-availability"} > (14.4 * (1 - 0.99))
+            and
+            slo:sli_error:ratio_rate5m{slo="api-availability"} > (14.4 * (1 - 0.99))
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: API is burning its 28d error budget 14.4x too fast
+            description: >-
+              {{ $value | humanizePercentage }} of API requests failed over the
+              last hour (threshold 14.4%). At this rate the monthly error budget
+              is gone in about 2 days.
+        - alert: SLOErrorBudgetBurnSlow
+          expr: >-
+            slo:sli_error:ratio_rate6h{slo="api-availability"} > (6 * (1 - 0.99))
+            and
+            slo:sli_error:ratio_rate30m{slo="api-availability"} > (6 * (1 - 0.99))
+          for: 15m
+          labels:
+            severity: ticket
+          annotations:
+            summary: API is burning its 28d error budget 6x too fast
+            description: >-
+              {{ $value | humanizePercentage }} of API requests failed over the
+              last 6 hours (threshold 6%). At this rate the monthly error budget
+              is gone in under 5 days.

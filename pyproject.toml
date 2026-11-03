@@ -12,6 +12,6 @@ ignore = ["B008"]  # FastAPI uses function calls (Depends, Query) as parameter d
 "*/tests/*" = ["S101", "S105", "S106"]
 
 [tool.pytest.ini_options]
-testpaths = ["app/tests", "pipeline/tests"]
+testpaths = ["app/tests", "pipeline/tests", "monitoring/tests"]
 pythonpath = ["app", "pipeline"]
 markers = ["integration: needs a PostgreSQL database (TEST_POSTGRES_DSN)"]

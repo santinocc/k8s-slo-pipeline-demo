@@ -1,0 +1,79 @@
+# promtool unit tests for monitoring/slo-rules.yaml. Run with `make test-rules`,
+# which extracts the PrometheusRule spec into slo-rules.rules.yaml first.
+rule_files:
+  - slo-rules.rules.yaml
+evaluation_interval: 30s
+
+tests:
+  # 0.5% errors: within budget, nothing fires.
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="api", namespace="slo-demo", route="/items", status="200"}'
+        values: '0+995x120'
+      - series: 'http_requests_total{job="api", namespace="slo-demo", route="/items", status="503"}'
+        values: '0+5x120'
+    promql_expr_test:
+      - expr: slo:sli_error:ratio_rate5m
+        eval_time: 30m
+        exp_samples:
+          - labels: 'slo:sli_error:ratio_rate5m{slo="api-availability"}'
+            value: 0.005
+    alert_rule_test:
+      - {eval_time: 30m, alertname: SLOErrorBudgetBurnFast, exp_alerts: []}
+      - {eval_time: 90m, alertname: SLOErrorBudgetBurnSlow, exp_alerts: []}
+
+  # Errors on probe/scrape routes are excluded from the SLI.
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="api", namespace="slo-demo", route="/items", status="200"}'
+        values: '0+100x60'
+      - series: 'http_requests_total{job="api", namespace="slo-demo", route="/ready", status="503"}'
+        values: '0+100x60'
+    promql_expr_test:
+      - expr: slo:sli_error:ratio_rate5m
+        eval_time: 20m
+        exp_samples:
+          - labels: 'slo:sli_error:ratio_rate5m{slo="api-availability"}'
+            value: 0
+    alert_rule_test:
+      - {eval_time: 20m, alertname: SLOErrorBudgetBurnFast, exp_alerts: []}
+
+  # 25% errors for 30 minutes, then recovery.
+  - interval: 1m
+    input_series:
+      - series: 'http_requests_total{job="api", namespace="slo-demo", route="/items", status="200"}'
+        values: '0+75x120'
+      - series: 'http_requests_total{job="api", namespace="slo-demo", route="/chaos", status="500"}'
+        values: '0+25x30 750+0x90'
+    promql_expr_test:
+      - expr: slo:sli_error:ratio_rate5m
+        eval_time: 20m
+        exp_samples:
+          - labels: 'slo:sli_error:ratio_rate5m{slo="api-availability"}'
+            value: 0.25
+    alert_rule_test:
+      # Pending, not firing yet: the condition must hold for 2m.
+      - {eval_time: 2m, alertname: SLOErrorBudgetBurnFast, exp_alerts: []}
+      - eval_time: 10m
+        alertname: SLOErrorBudgetBurnFast
+        exp_alerts:
+          - exp_labels: {severity: page, slo: api-availability}
+            exp_annotations:
+              summary: API is burning its 28d error budget 14.4x too fast
+              description: >-
+                25% of API requests failed over the last hour (threshold 14.4%).
+                At this rate the monthly error budget is gone in about 2 days.
+      # Slow alert needs its condition to hold for 15m.
+      - {eval_time: 10m, alertname: SLOErrorBudgetBurnSlow, exp_alerts: []}
+      - eval_time: 25m
+        alertname: SLOErrorBudgetBurnSlow
+        exp_alerts:
+          - exp_labels: {severity: ticket, slo: api-availability}
+            exp_annotations:
+              summary: API is burning its 28d error budget 6x too fast
+              description: >-
+                25% of API requests failed over the last 6 hours (threshold 6%).
+                At this rate the monthly error budget is gone in under 5 days.
+      # 10 minutes after recovery the 1h ratio is still above 14.4%, but the
+      # 5m short window is clean, so the fast alert has already cleared.
+      - {eval_time: 40m, alertname: SLOErrorBudgetBurnFast, exp_alerts: []}
