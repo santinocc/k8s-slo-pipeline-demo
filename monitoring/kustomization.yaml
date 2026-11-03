@@ -1,0 +1,20 @@
+# Monitoring resources for the API: applied after kube-prometheus-stack is
+# installed (it provides the ServiceMonitor and PrometheusRule CRDs).
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: slo-demo
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: slo-demo
+resources:
+  - servicemonitor.yaml
+  - slo-rules.yaml
+configMapGenerator:
+  # The Grafana sidecar loads ConfigMaps with this label as dashboards.
+  - name: grafana-dashboard-slo-demo
+    files:
+      - dashboards/slo-demo-api.json
+    options:
+      disableNameSuffixHash: true
+      labels:
+        grafana_dashboard: "1"

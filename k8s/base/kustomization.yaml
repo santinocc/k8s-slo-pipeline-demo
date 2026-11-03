@@ -20,6 +20,8 @@ configMapGenerator:
       - POSTGRES_PORT=5432
       - POSTGRES_DB=slo_demo
       - APP_LOG_LEVEL=info
+      # /chaos error injection is off; scripts/slo-alert-demo.sh turns it on.
+      - CHAOS_ENABLED=false
   - name: postgres-init
     files:
       - schema.sql

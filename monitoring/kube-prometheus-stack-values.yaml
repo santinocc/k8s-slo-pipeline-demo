@@ -1,0 +1,84 @@
+# Helm values for kube-prometheus-stack, trimmed for a single-node kind cluster
+# with 4 CPUs and 4 GB of memory. Local learning setup only.
+#
+# With the chart defaults, the cluster overloaded (control-plane pods restarting
+# in a loop): the default scrapes of the API server, kubelet/cAdvisor, and
+# node-exporter, plus hundreds of default recording rules, cost more CPU than
+# this cluster has. Only what the SLO demo needs is kept: Prometheus,
+# Alertmanager, Grafana, kube-state-metrics, and the operator.
+
+fullnameOverride: kps
+
+# No default cluster alerts or recording rules; this project ships its own.
+defaultRules:
+  create: false
+
+# No scraping of cluster components. (kind also binds etcd, scheduler,
+# controller-manager, and kube-proxy metrics to localhost, so they would fail.)
+kubeApiServer: {enabled: false}
+kubelet: {enabled: false}
+kubeControllerManager: {enabled: false}
+coreDns: {enabled: false}
+kubeDns: {enabled: false}
+kubeEtcd: {enabled: false}
+kubeScheduler: {enabled: false}
+kubeProxy: {enabled: false}
+nodeExporter: {enabled: false}
+
+prometheus:
+  service:
+    type: NodePort
+    nodePort: 30090  # localhost:9090 via kind/kind-config.yaml
+  prometheusSpec:
+    scrapeInterval: 15s
+    evaluationInterval: 30s
+    retention: 2d
+    # Pick up ServiceMonitors and PrometheusRules from any namespace, not only
+    # ones labelled for this Helm release.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+    resources:
+      requests: {cpu: 100m, memory: 400Mi}
+      limits: {memory: 1Gi}
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {memory: 128Mi}
+
+grafana:
+  # No default cluster dashboards; this project ships its own.
+  defaultDashboardsEnabled: false
+  # Admin credentials come from a Secret that `make monitoring` creates from .env.
+  admin:
+    existingSecret: grafana-admin
+    userKey: admin-user
+    passwordKey: admin-password
+  service:
+    type: NodePort
+    nodePort: 30300  # localhost:3000 via kind/kind-config.yaml
+  grafana.ini:
+    # Read-only anonymous access so dashboards open without a login.
+    # Acceptable only on a local learning cluster.
+    auth.anonymous:
+      enabled: true
+      org_role: Viewer
+  sidecar:
+    dashboards:
+      # Load dashboards from ConfigMaps labelled grafana_dashboard=1 in any namespace.
+      searchNamespace: ALL
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {memory: 384Mi}
+
+prometheusOperator:
+  resources:
+    requests: {cpu: 20m, memory: 64Mi}
+    limits: {memory: 256Mi}
+
+kube-state-metrics:
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 128Mi}
