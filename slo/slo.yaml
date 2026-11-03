@@ -1,0 +1,41 @@
+# Availability SLO for the API (learning project; values chosen for a demo).
+# monitoring/slo-rules.yaml implements this definition as Prometheus recording
+# and alerting rules; monitoring/tests/test_slo_rules.py checks the two agree.
+name: api-availability
+service: slo-demo-api
+description: >
+  99% of API requests return a non-5xx response, measured over a rolling
+  28-day window. Probe and scrape endpoints (/health, /ready, /metrics) are
+  excluded so that Kubernetes and Prometheus traffic does not dilute the SLI.
+
+objective: 0.99          # 99% of requests are good
+window: 28d              # rolling compliance window
+# error budget = 1 - objective = 1% of requests in the window
+
+sli:
+  type: request-based availability
+  # "{{window}}" is replaced with each rate window (5m, 30m, 1h, 6h, 28d).
+  error_query: >-
+    sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics", status=~"5.."}[{{window}}]))
+  total_query: >-
+    sum(rate(http_requests_total{job="api", namespace="slo-demo", route!~"/health|/ready|/metrics"}[{{window}}]))
+  # error ratio = error_query / total_query; good events = total - errors
+
+# Multi-window, multi-burn-rate alerts (Google SRE Workbook, chapter 5).
+# Burn rate 1 = spending the budget exactly over the 28d window.
+# An alert fires only when BOTH windows exceed the threshold: the long window
+# shows the burn is significant, the short window shows it is still happening,
+# so the alert clears soon after recovery.
+alerting:
+  - alert: SLOErrorBudgetBurnFast
+    burn_rate: 14.4      # error ratio > 14.4%: ~2% of the 28d budget per hour
+    long_window: 1h
+    short_window: 5m
+    for: 2m
+    severity: page
+  - alert: SLOErrorBudgetBurnSlow
+    burn_rate: 6         # error ratio > 6%: ~5% of the 28d budget per 6 hours
+    long_window: 6h
+    short_window: 30m
+    for: 15m
+    severity: ticket
