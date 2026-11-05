@@ -28,7 +28,7 @@ CRD_SCHEMAS := https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.G
 	ingest-now pipeline-check pipeline-fail-demo monitoring slo-alert-demo
 
 help: ## Show available targets
-	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-12s %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
 
 $(BIN)/activate: app/requirements.txt app/requirements-dev.txt
 	$(PYTHON) -m venv $(VENV)
