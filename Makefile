@@ -69,10 +69,8 @@ build: ## Build the API and pipeline container images
 	docker build -t $(IMAGE):$(TAG) app
 	docker build -t $(PIPELINE_IMAGE):$(TAG) pipeline
 
-image-size: ## Print the image sizes
-	@for i in $(IMAGE) $(PIPELINE_IMAGE); do \
-		docker image inspect $$i:$(TAG) --format '{{.Size}}' | awk -v n=$$i:$(TAG) '{printf "%s %.1f MB\n", n, $$1/1000/1000}'; \
-	done
+image-size: ## Check both images are under 200 MB and run as UID 10001
+	scripts/image-check.sh $(IMAGE):$(TAG) $(PIPELINE_IMAGE):$(TAG)
 
 run: build ## Run the API image locally on :8000 using values from .env
 	docker run --rm -p 8000:8000 --env-file .env $(IMAGE):$(TAG)
