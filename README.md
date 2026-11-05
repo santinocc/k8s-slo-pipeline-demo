@@ -68,7 +68,7 @@ flowchart LR
 | [`slo/slo.yaml`](slo/slo.yaml) | The SLO definition: objective, window, SLI queries, alert parameters |
 | [`kind/kind-config.yaml`](kind/kind-config.yaml) | Cluster config with a pinned node image and localhost port mappings |
 | [`scripts/`](scripts/) | Verification scripts used by the Makefile |
-| [`docs/`](docs/) | [Decision records](docs/decisions.md), [visual walkthrough](docs/walkthrough.md), [SLO alert demo](docs/slo-alert-demo.md) with screenshots |
+| [`docs/`](docs/) | [Decision records](docs/decisions.md), [visual walkthrough](docs/walkthrough.md), [alert runbook](docs/runbook-slo-burn-rate.md), [SLO alert demo](docs/slo-alert-demo.md) with screenshots |
 
 ## Prerequisites
 
@@ -161,7 +161,7 @@ cluster demos (`rollout-check`, `load-test`, the pipeline checks, and
 | Data pipeline | `make pipeline-check` | Two runs in a row: still 50 unique rows, nothing inserted twice |
 | | `make pipeline-fail-demo` | Wrong DB password: Job fails with `BackoffLimitExceeded` after 1 attempt plus 3 retries |
 | Monitoring and SLO | `make test-rules` | promtool checks and unit-tests the alert rules |
-| | `make slo-alert-demo` | Injects about 25% errors via `/chaos` until `SLOErrorBudgetBurnFast` fires, then recovers until it clears (about 12 minutes) |
+| | `make slo-alert-demo` | Injects about 25% errors via `/chaos` until `SLOErrorBudgetBurnFast` fires, then recovers until it clears (about 12 minutes). The [runbook](docs/runbook-slo-burn-rate.md) says how to respond |
 
 The SLO alert demo from 2026-11-03, with a timeline and screenshots, is in
 [docs/slo-alert-demo.md](docs/slo-alert-demo.md). Screenshots of the running
@@ -282,8 +282,9 @@ This project stops at a local cluster. On AWS, the same design would change like
   Grafana, or self-hosted Prometheus with long-term storage (Thanos or Mimir).
   The default cluster rules and dashboards would stay on.
 - **Alert routing:** Alertmanager routes by severity: `page` to an on-call tool
-  (PagerDuty or Opsgenie) and `ticket` to a team channel or issue queue. Every
-  alert would link to a runbook, and there would be a separate "no traffic" alert.
+  (PagerDuty or Opsgenie) and `ticket` to a team channel or issue queue. The
+  alerts here already link to [a runbook](docs/runbook-slo-burn-rate.md)
+  through `runbook_url`; there would also be a separate "no traffic" alert.
 - **Pipeline:** keep the CronJob for simple single-step jobs. Use Airflow (MWAA),
   Argo Workflows, or Step Functions once there are dependencies, backfills, or
   lineage requirements.

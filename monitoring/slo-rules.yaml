@@ -59,6 +59,7 @@ spec:
               {{ $value | humanizePercentage }} of API requests failed over the
               last hour (threshold 14.4%). At this rate the monthly error budget
               is gone in about 2 days.
+            runbook_url: https://github.com/santinocc/k8s-slo-pipeline-demo/blob/main/docs/runbook-slo-burn-rate.md
         - alert: SLOErrorBudgetBurnSlow
           expr: >-
             slo:sli_error:ratio_rate6h{slo="api-availability"} > (6 * (1 - 0.99))
@@ -73,3 +74,4 @@ spec:
               {{ $value | humanizePercentage }} of API requests failed over the
               last 6 hours (threshold 6%). At this rate the monthly error budget
               is gone in under 5 days.
+            runbook_url: https://github.com/santinocc/k8s-slo-pipeline-demo/blob/main/docs/runbook-slo-burn-rate.md

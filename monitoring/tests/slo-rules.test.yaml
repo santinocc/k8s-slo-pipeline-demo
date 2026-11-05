@@ -63,6 +63,7 @@ tests:
               description: >-
                 25% of API requests failed over the last hour (threshold 14.4%).
                 At this rate the monthly error budget is gone in about 2 days.
+              runbook_url: https://github.com/santinocc/k8s-slo-pipeline-demo/blob/main/docs/runbook-slo-burn-rate.md
       # Slow alert needs its condition to hold for 15m.
       - {eval_time: 10m, alertname: SLOErrorBudgetBurnSlow, exp_alerts: []}
       - eval_time: 25m
@@ -74,6 +75,7 @@ tests:
               description: >-
                 25% of API requests failed over the last 6 hours (threshold 6%).
                 At this rate the monthly error budget is gone in under 5 days.
+              runbook_url: https://github.com/santinocc/k8s-slo-pipeline-demo/blob/main/docs/runbook-slo-burn-rate.md
       # 10 minutes after recovery the 1h ratio is still above 14.4%, but the
       # 5m short window is clean, so the fast alert has already cleared.
       - {eval_time: 40m, alertname: SLOErrorBudgetBurnFast, exp_alerts: []}
