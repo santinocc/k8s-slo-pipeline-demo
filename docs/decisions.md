@@ -134,3 +134,47 @@ The reasons are written at the top of `monitoring/kube-prometheus-stack-values.y
   back on.
 - In production I would keep the default rules and dashboards, and run
   Prometheus with proper resources or use a managed service.
+
+---
+
+## ADR-006: Use Terraform for the cluster and Helm releases, Kustomize for the app
+
+**Status:** accepted (2026-11-05)
+
+**Context.** The SPEC's stretch goal is a Terraform module that creates the
+kind cluster or installs the Helm releases. The Makefile already does both
+with `kind create cluster` and `helm upgrade --install`. Terraform should add
+something (a plan before changes, drift detection, a clean destroy) without
+creating a second definition of the same platform. No cloud resources are allowed.
+
+**Decision.** `terraform/` manages the platform layer only:
+- the kind cluster, through the community `tehcyx/kind` provider (0.13.0)
+- metrics-server and kube-prometheus-stack, through `hashicorp/helm`
+- the `monitoring` namespace and the Grafana admin Secret, through
+  `hashicorp/kubernetes`, with the password from `hashicorp/random`
+
+It reads `kind/kind-config.yaml` with `yamldecode`, and the Helm values files
+with `file`, so `make cluster` and Terraform build the same thing. Providers
+are pinned to exact versions, and `.terraform.lock.hcl` is committed with
+checksums for macOS arm64 and Linux amd64.
+
+The app stays in Kustomize (`make deploy`), and the ServiceMonitor, SLO rules,
+and dashboard stay in `monitoring/` (`make monitoring-manifests`).
+
+**Consequences.**
+- `terraform plan` shows what will change before anything happens, and a
+  second plan after apply shows no changes. `terraform destroy` removed the
+  cluster, the Docker container, and the kubectl context in 31 s.
+- The ServiceMonitor and PrometheusRule are CRD instances. Their CRDs come from
+  the kube-prometheus-stack chart, so on a new cluster Terraform could not
+  plan them in the same run. Keeping them in Kustomize avoids a two-stage apply.
+- The Grafana admin password is stored in the local Terraform state in plain
+  text. That is acceptable for a git-ignored local file. A shared setup would
+  use a remote backend with encryption and access control (for example S3 with
+  KMS), or keep the secret out of Terraform entirely.
+- The Kubernetes and Helm providers are configured from the cluster resource in
+  the same configuration. This works for create and destroy, but it is fragile
+  when the cluster has to be replaced. In production the cluster and what runs
+  on it would be separate Terraform configurations (separate state).
+- `tehcyx/kind` is a community provider. For EKS, the official `hashicorp/aws`
+  provider (or the `terraform-aws-modules/eks` module) would take its place.

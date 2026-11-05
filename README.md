@@ -66,6 +66,7 @@ flowchart LR
 | [`k8s/base/`](k8s/base/) | Kustomize manifests: Postgres, API, HPA, CronJob, Secret example |
 | [`monitoring/`](monitoring/) | Helm values, ServiceMonitor, PrometheusRule, Grafana dashboard, rule tests |
 | [`slo/slo.yaml`](slo/slo.yaml) | The SLO definition: objective, window, SLI queries, alert parameters |
+| [`terraform/`](terraform/) | Optional Terraform for the kind cluster and Helm releases |
 | [`kind/kind-config.yaml`](kind/kind-config.yaml) | Cluster config with a pinned node image and localhost port mappings |
 | [`scripts/`](scripts/) | Verification scripts used by the Makefile |
 | [`docs/`](docs/) | [Decision records](docs/decisions.md), [visual walkthrough](docs/walkthrough.md), [alert runbook](docs/runbook-slo-burn-rate.md), [SLO alert demo](docs/slo-alert-demo.md) with screenshots |
@@ -82,6 +83,7 @@ flowchart LR
 | make, curl, openssl | any recent | Makefile targets |
 | [hey](https://github.com/rakyll/hey) | any | HPA load test and the SLO alert demo |
 | [kubeconform](https://github.com/yannh/kubeconform) | 0.8 | `make validate` |
+| [Terraform](https://developer.hashicorp.com/terraform) (optional) | 1.17 | The [Terraform alternative](#alternative-create-the-cluster-with-terraform) to `make cluster` and `make monitoring` |
 
 On macOS with Homebrew:
 
@@ -144,7 +146,8 @@ Each check either prints PASS or fails with a non-zero exit code.
 
 On every push and pull request, [GitHub Actions](.github/workflows/ci.yml) runs
 `make test`, `make test-integration`, `make test-rules`, `make build`,
-`make image-size`, and `make validate` (against a throwaway kind cluster). The
+`make image-size`, `make tf-check`, and `make validate` (against a throwaway
+kind cluster). The
 cluster demos (`rollout-check`, `load-test`, the pipeline checks, and
 `slo-alert-demo`) run only locally.
 
@@ -169,6 +172,41 @@ cluster, Prometheus, the Grafana dashboard (healthy and overloaded), and CI are
 in [docs/walkthrough.md](docs/walkthrough.md).
 
 ![Grafana SLO dashboard during steady traffic](docs/walkthrough-grafana-healthy.png)
+
+## Alternative: create the cluster with Terraform
+
+[`terraform/`](terraform/) builds the same platform as `make cluster` plus
+`make monitoring`: the kind cluster, metrics-server, and kube-prometheus-stack.
+It reads the same `kind/kind-config.yaml` and Helm values files, so the two
+paths cannot drift apart. No cloud provider is used, and the state stays local
+(git-ignored). Use one path or the other on a given cluster, not both.
+
+```bash
+brew install hashicorp/tap/terraform
+```
+
+```bash
+make tf-plan tf-apply
+```
+
+```bash
+make deploy monitoring-manifests
+```
+
+Terraform generates the Grafana admin password; read it with
+`terraform -chdir=terraform output -raw grafana_admin_password`. The kind
+provider also writes a kubeconfig with the cluster credentials to
+`terraform/slo-demo-config`. It is git-ignored, like the state and plan files.
+To remove everything:
+
+```bash
+make tf-destroy
+```
+
+On 2026-11-05 this took 167 s for `tf-apply`, 77 s for the app, and 31 s for
+`tf-destroy`. A second `terraform plan` after the apply showed no changes. The
+reasons for the split between Terraform and Kustomize are in
+[ADR-006](docs/decisions.md#adr-006-use-terraform-for-the-cluster-and-helm-releases-kustomize-for-the-app).
 
 ## Tear down
 
@@ -265,8 +303,9 @@ This project stops at a local cluster. On AWS, the same design would change like
 
 - **Cluster:** Amazon EKS with managed node groups or Karpenter across several
   Availability Zones, PodDisruptionBudgets, topology spread constraints, and
-  NetworkPolicies. Cluster and add-ons would be managed with Terraform, and
-  workloads deployed through GitOps (Argo CD or Flux).
+  NetworkPolicies. Cluster and add-ons would be managed with Terraform (the
+  same split as the local `terraform/`, with the AWS provider and remote state
+  in S3), and workloads deployed through GitOps (Argo CD or Flux).
 - **Identity and secrets:** IRSA or EKS Pod Identity, so pods get short-lived AWS
   credentials without static keys. Secrets would live in AWS Secrets Manager and
   be synced with the External Secrets Operator, instead of a `.env` file.
@@ -293,7 +332,7 @@ This project stops at a local cluster. On AWS, the same design would change like
 
 The reasons behind the main choices are in [docs/decisions.md](docs/decisions.md):
 why kind, why Python and FastAPI, why burn-rate alerts, why a CronJob over
-Airflow, and why the monitoring stack is trimmed.
+Airflow, why the monitoring stack is trimmed, and what Terraform manages.
 
 ## License
 
