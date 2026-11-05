@@ -1,5 +1,7 @@
 # k8s-slo-pipeline-demo
 
+[![ci](https://github.com/santinocc/k8s-slo-pipeline-demo/actions/workflows/ci.yml/badge.svg)](https://github.com/santinocc/k8s-slo-pipeline-demo/actions/workflows/ci.yml)
+
 A hands-on **learning project** that runs a small Python API, a scheduled data
 pipeline, and SLO-based monitoring on a local Kubernetes cluster (kind).
 Everything runs on a laptop; no cloud resources are used. It is not production
@@ -140,6 +142,12 @@ Run `make help` to list every target.
 
 Each check either prints PASS or fails with a non-zero exit code.
 
+On every push and pull request, [GitHub Actions](.github/workflows/ci.yml) runs
+`make test`, `make test-integration`, `make test-rules`, `make build`,
+`make image-size`, and `make validate` (against a throwaway kind cluster). The
+cluster demos (`rollout-check`, `load-test`, the pipeline checks, and
+`slo-alert-demo`) run only locally.
+
 | Milestone | Command | What it shows |
 |---|---|---|
 | API and image | `make test` | Lint, format check, and unit tests (API, pipeline, SLO rule consistency) |
@@ -252,9 +260,9 @@ This project stops at a local cluster. On AWS, the same design would change like
 - **Database:** Amazon RDS or Aurora PostgreSQL (Multi-AZ, automated backups,
   point-in-time recovery) instead of a StatefulSet. The API would connect
   through RDS Proxy or PgBouncer.
-- **Images and delivery:** Amazon ECR with immutable tags and image scanning. CI
-  would run lint, tests, and `make validate`, then build and sign images.
-  Rollouts would be progressive (Argo Rollouts canary gated on the SLO).
+- **Images and delivery:** Amazon ECR with immutable tags and image scanning.
+  The CI workflow here already runs lint, tests, validation, and the image
+  build; in production it would also scan, sign, and push the images. Rollouts would be progressive (Argo Rollouts canary gated on the SLO).
 - **Traffic:** AWS Load Balancer Controller with an ALB, TLS from ACM, and a WAF
   in front.
 - **Observability:** Amazon Managed Service for Prometheus and Amazon Managed
