@@ -25,7 +25,8 @@ CRD_SCHEMAS := https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.G
 .DEFAULT_GOAL := help
 .PHONY: help venv lint format test test-integration test-rules build image-size run \
 	cluster secret deploy redeploy validate rollout-check load-test status teardown \
-	ingest-now pipeline-check pipeline-fail-demo monitoring slo-alert-demo
+	ingest-now pipeline-check pipeline-fail-demo monitoring monitoring-manifests slo-alert-demo \
+	tf-init tf-plan tf-apply tf-destroy tf-check
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  %-20s %s\n", $$1, $$2}'
@@ -157,6 +158,9 @@ monitoring: .env ## Install kube-prometheus-stack, the ServiceMonitor, SLO rules
 		--repo https://prometheus-community.github.io/helm-charts \
 		--version $(KPS_CHART_VERSION) \
 		--namespace monitoring -f monitoring/kube-prometheus-stack-values.yaml --wait --timeout 10m
+	$(MAKE) monitoring-manifests
+
+monitoring-manifests: ## Apply the ServiceMonitor, SLO rules, and Grafana dashboard
 	$(KUBECTL) apply -k monitoring
 	@echo "Grafana: http://localhost:3000/d/slo-demo-api   Prometheus: http://localhost:9090"
 
@@ -168,3 +172,25 @@ status: ## Show pods, Jobs, CronJobs, HPA, and Services
 
 teardown: ## Delete the kind cluster
 	kind delete cluster --name $(CLUSTER)
+
+# Terraform path: creates the same kind cluster and Helm releases as
+# `make cluster` plus `make monitoring`. Use one path or the other, not both.
+TERRAFORM := terraform -chdir=terraform
+
+tf-init: ## Terraform: download the pinned providers
+	$(TERRAFORM) init -input=false
+
+tf-plan: tf-init ## Terraform: plan the kind cluster and Helm releases into terraform/tfplan
+	$(TERRAFORM) plan -input=false -out=tfplan
+
+tf-apply: ## Terraform: apply the saved plan from tf-plan
+	$(TERRAFORM) apply -input=false tfplan
+	rm -f terraform/tfplan
+
+tf-destroy: tf-init ## Terraform: destroy the cluster and everything in it
+	$(TERRAFORM) destroy -input=false
+
+tf-check: ## Terraform: format check and validate (no cluster needed)
+	terraform -chdir=terraform fmt -check -recursive
+	$(TERRAFORM) init -input=false -backend=false >/dev/null
+	$(TERRAFORM) validate

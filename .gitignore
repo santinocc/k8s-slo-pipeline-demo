@@ -29,6 +29,10 @@ monitoring/charts/
 .terraform/
 *.tfstate
 *.tfstate.*
+tfplan
+*.tfplan
+# kubeconfig the kind Terraform provider writes next to the config
+terraform/*-config
 
 # Editors and OS
 .vscode/
