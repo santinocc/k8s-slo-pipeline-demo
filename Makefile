@@ -59,7 +59,8 @@ test-integration: venv ## Run Postgres-backed tests against a throwaway containe
 	TEST_POSTGRES_DSN="postgresql://test:test@127.0.0.1:$$port/test" $(BIN)/pytest -q -m integration
 
 test-rules: venv ## Check and unit-test the SLO Prometheus rules with promtool
-	@dir=$$(mktemp -d); trap 'rm -rf '$$dir EXIT; \
+	@# mktemp -d is mode 700; the distroless promtool image runs as nobody and must read it.
+	@dir=$$(mktemp -d); trap 'rm -rf '$$dir EXIT; chmod 755 $$dir; \
 	$(BIN)/python -c 'import sys, yaml; d = yaml.safe_load(open("monitoring/slo-rules.yaml")); yaml.safe_dump(d["spec"], open(sys.argv[1], "w"), sort_keys=False)' $$dir/slo-rules.rules.yaml; \
 	cp monitoring/tests/slo-rules.test.yaml $$dir/; \
 	docker run --rm -v $$dir:/rules:ro -w /rules --entrypoint /bin/promtool $(PROMETHEUS_IMAGE) check rules slo-rules.rules.yaml && \
