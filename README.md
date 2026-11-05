@@ -187,6 +187,35 @@ These are deliberate simplifications for a local learning setup:
 
 ## What I learned
 
+### The short version (explained to a 10-year-old)
+
+Imagine a lemonade stand run by robots.
+
+- **The robots (the API)** hand out lemonade when people ask. There are always
+  at least 2. When a crowd shows up, more robots join automatically (up to 6),
+  and they go rest when the crowd leaves. When the robots learn a new trick,
+  they are swapped one at a time, so the stand never closes.
+- **The delivery truck (the CronJob)** brings a list of 50 lemons to the
+  storage room (PostgreSQL) every 5 minutes. If it comes twice by accident, it
+  does not stack up double lemons. If it breaks down, it tries 3 more times and
+  then raises a red flag so someone notices.
+- **The promise (the SLO)** is "99 out of every 100 people get their
+  lemonade." That leaves an oops allowance of 1 in 100.
+- **The smart alarm (burn-rate alerts)** does not ring when one cup spills. It
+  rings when the oops allowance is being used up far too fast. I tested it by
+  making the robots spill on purpose: it rang after about 4 minutes and went
+  quiet about 4.5 minutes after the spilling stopped.
+- **The scoreboard (Grafana)** shows how many people got lemonade, how fast,
+  and how much oops allowance is left.
+- **The instruction book (this README)** lets anyone build the same stand on
+  their own laptop in a few minutes.
+
+Before, there was one robot, no backup, and no alarm: you would only find out
+something was wrong when thirsty people walked away. Real services work the
+same way as this practice stand, just much bigger.
+
+### The details
+
 - **Readiness and liveness answer different questions.** Liveness (`/health`)
   only checks the process, so a database outage does not cause a restart loop.
   Readiness (`/ready`) checks the database, so traffic stops reaching pods that

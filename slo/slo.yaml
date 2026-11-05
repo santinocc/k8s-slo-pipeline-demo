@@ -7,6 +7,22 @@ description: >
   99% of API requests return a non-5xx response, measured over a rolling
   28-day window. Probe and scrape endpoints (/health, /ready, /metrics) are
   excluded so that Kubernetes and Prometheus traffic does not dilute the SLI.
+# The same SLO in everyday words, using the lemonade-stand picture from the README.
+plain_language: |
+  The promise: out of every 100 people who ask for lemonade, at least 99 get it.
+  We keep score over the last 4 weeks, so one bad minute does not ruin the month.
+  A failure is when someone asks and gets nothing because the robot broke (a 5xx
+  error). The robots' own check-ups (/health, /ready) and the scoreboard keeper
+  (/metrics) are not real customers, so they are not counted.
+  That leaves an oops allowance (the error budget) of 1 in 100: a jar of oops
+  tokens for the month, and every failed cup uses one.
+  Loud alarm (fast burn, page): more than about 14 in 100 keep failing. At that
+  speed the jar is empty in about 2 days, so someone must come right now.
+  Quiet note (slow burn, ticket): more than 6 in 100 keep failing for hours. The
+  jar would be empty in under 5 days, so we fix it soon.
+  Each alarm checks twice: has it been bad for a while (long window), and is it
+  still bad right now (short window)? It rings only if both are true, so one
+  spilled cup does not set it off, and it stops soon after things get better.
 
 objective: 0.99          # 99% of requests are good
 window: 28d              # rolling compliance window
