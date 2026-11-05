@@ -68,7 +68,7 @@ flowchart LR
 | [`slo/slo.yaml`](slo/slo.yaml) | The SLO definition: objective, window, SLI queries, alert parameters |
 | [`kind/kind-config.yaml`](kind/kind-config.yaml) | Cluster config with a pinned node image and localhost port mappings |
 | [`scripts/`](scripts/) | Verification scripts used by the Makefile |
-| [`docs/`](docs/) | [Decision records](docs/decisions.md), [SLO alert demo](docs/slo-alert-demo.md) with screenshots |
+| [`docs/`](docs/) | [Decision records](docs/decisions.md), [visual walkthrough](docs/walkthrough.md), [SLO alert demo](docs/slo-alert-demo.md) with screenshots |
 
 ## Prerequisites
 
@@ -164,7 +164,11 @@ cluster demos (`rollout-check`, `load-test`, the pipeline checks, and
 | | `make slo-alert-demo` | Injects about 25% errors via `/chaos` until `SLOErrorBudgetBurnFast` fires, then recovers until it clears (about 12 minutes) |
 
 The SLO alert demo from 2026-11-03, with a timeline and screenshots, is in
-[docs/slo-alert-demo.md](docs/slo-alert-demo.md).
+[docs/slo-alert-demo.md](docs/slo-alert-demo.md). Screenshots of the running
+cluster, Prometheus, the Grafana dashboard (healthy and overloaded), and CI are
+in [docs/walkthrough.md](docs/walkthrough.md).
+
+![Grafana SLO dashboard during steady traffic](docs/walkthrough-grafana-healthy.png)
 
 ## Tear down
 
@@ -190,6 +194,11 @@ These are deliberate simplifications for a local learning setup:
 - kube-prometheus-stack is trimmed to fit 4 CPUs and 4 GB (see
   [ADR-005](docs/decisions.md#adr-005-trim-kube-prometheus-stack-to-fit-a-4-cpu--4-gb-cluster)),
   so there are no default cluster-health alerts or node dashboards.
+- The SLI only counts responses the API sent. Timeouts and requests that hit a
+  restarting pod are not counted, so an overloaded cluster can still show 100%
+  (see [the walkthrough](docs/walkthrough.md#5-grafana-dashboard-overloaded)).
+- With monitoring installed, `make load-test` can overload a 4 CPU node: the
+  API server stops answering and the test fails, then the cluster recovers.
 - A new cluster has only minutes of data, so the 28-day availability and error
   budget panels show extreme values after the demo.
 
@@ -242,6 +251,10 @@ same way as this practice stand, just much bigger.
   The short window is what makes it clear quickly.
 - **Test the alert rules like code.** promtool unit tests, and a check that the
   rules match `slo/slo.yaml`, caught mistakes before anything was deployed.
+- **An SLI only sees what it measures.** Under overload, pods restarted 17
+  times and p99 latency reached 5 seconds, yet availability stayed at 100%,
+  because requests that never got a response were never counted. Measuring
+  from the client side and adding a latency SLO would close that gap.
 - **Monitoring has a resource cost.** The default kube-prometheus-stack
   overloaded a 4 CPU / 4 GB cluster until the control plane restarted in a loop.
   Choosing what to scrape and evaluate is part of the design.
